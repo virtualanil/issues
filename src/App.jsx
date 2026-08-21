@@ -1,22 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import "./App.css";
-
-import Login from "./Login";
-import Register from "./Register";
-
-import { auth, db } from "./firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-
-import {
-  addDoc,
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  updateDoc,
-  doc,
-} from "firebase/firestore";
 
 const initialIssues = [
   {
@@ -72,10 +55,6 @@ const initialIssues = [
 ];
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [showRegister, setShowRegister] = useState(false);
-
   const [issues, setIssues] = useState(initialIssues);
   const [activePage, setActivePage] = useState("Dashboard");
   const [search, setSearch] = useState("");
@@ -90,237 +69,71 @@ function App() {
     assignee: "Unassigned",
   });
 
-  /* =========================
-     FIREBASE AUTH
-  ========================= */
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  /* =========================
-     FIRESTORE ISSUES
-  ========================= */
-
-  useEffect(() => {
-    if (!user) return;
-
-    const issuesQuery = query(
-      collection(db, "issues"),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe = onSnapshot(
-      issuesQuery,
-      (snapshot) => {
-        const firestoreIssues = snapshot.docs.map((item) => ({
-          id: item.id,
-          ...item.data(),
-        }));
-
-        if (firestoreIssues.length > 0) {
-          setIssues(firestoreIssues);
-        } else {
-          setIssues([]);
-        }
-      },
-      (error) => {
-        console.error("Firestore error:", error);
-      }
-    );
-
-    return unsubscribe;
-  }, [user]);
-
-  /* =========================
-     STATISTICS
-  ========================= */
-
-  const stats = useMemo(() => {
-    return {
+  const stats = useMemo(
+    () => ({
       total: issues.length,
+      open: issues.filter((i) => i.status === "Open").length,
+      progress: issues.filter((i) => i.status === "In Progress").length,
+      resolved: issues.filter((i) => i.status === "Resolved").length,
+      critical: issues.filter((i) => i.priority === "Critical").length,
+    }),
+    [issues]
+  );
 
-      open: issues.filter(
-        (issue) => issue.status === "Open"
-      ).length,
+  const filteredIssues = issues.filter((issue) => {
+    const matchesSearch =
+      issue.title.toLowerCase().includes(search.toLowerCase()) ||
+      issue.id.toLowerCase().includes(search.toLowerCase()) ||
+      issue.assignee.toLowerCase().includes(search.toLowerCase());
 
-      progress: issues.filter(
-        (issue) => issue.status === "In Progress"
-      ).length,
+    const matchesStatus =
+      statusFilter === "All" || issue.status === statusFilter;
 
-      resolved: issues.filter(
-        (issue) => issue.status === "Resolved"
-      ).length,
+    return matchesSearch && matchesStatus;
+  });
 
-      critical: issues.filter(
-        (issue) => issue.priority === "Critical"
-      ).length,
+  const handleCreateIssue = (e) => {
+    e.preventDefault();
+
+    if (!newIssue.title.trim()) return;
+
+    const issue = {
+      id: `ISS-${1001 + issues.length}`,
+      title: newIssue.title,
+      description: newIssue.description,
+      priority: newIssue.priority,
+      status: "Open",
+      category: newIssue.category,
+      assignee: newIssue.assignee,
+      date: "21 Aug 2026",
     };
-  }, [issues]);
 
-  /* =========================
-     SEARCH + FILTER
-  ========================= */
-
-  const filteredIssues = useMemo(() => {
-    const searchText = search.toLowerCase().trim();
-
-    return issues.filter((issue) => {
-      const matchesSearch =
-        !searchText ||
-        issue.title?.toLowerCase().includes(searchText) ||
-        issue.id?.toLowerCase().includes(searchText) ||
-        issue.assignee?.toLowerCase().includes(searchText) ||
-        issue.category?.toLowerCase().includes(searchText);
-
-      const matchesStatus =
-        statusFilter === "All" ||
-        issue.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
+    setIssues([issue, ...issues]);
+    setNewIssue({
+      title: "",
+      description: "",
+      priority: "Medium",
+      category: "General",
+      assignee: "Unassigned",
     });
-  }, [issues, search, statusFilter]);
-
-  /* =========================
-     CREATE ISSUE
-  ========================= */
-
-  const handleCreateIssue = async (event) => {
-    event.preventDefault();
-
-    if (!newIssue.title.trim()) {
-      alert("Please enter an issue title.");
-      return;
-    }
-
-    if (!user) {
-      alert("Please login first.");
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, "issues"), {
-        title: newIssue.title.trim(),
-        description: newIssue.description.trim(),
-        priority: newIssue.priority,
-        status: "Open",
-        category: newIssue.category,
-        assignee: newIssue.assignee,
-        createdBy: user.email || "Unknown",
-        createdAt: serverTimestamp(),
-        date: new Date().toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-      });
-
-      setNewIssue({
-        title: "",
-        description: "",
-        priority: "Medium",
-        category: "General",
-        assignee: "Unassigned",
-      });
-
-      setShowModal(false);
-      setActivePage("All Issues");
-    } catch (error) {
-      console.error("Create issue error:", error);
-      alert("Unable to create issue. Please try again.");
-    }
+    setShowModal(false);
+    setActivePage("All Issues");
   };
 
-  /* =========================
-     UPDATE STATUS
-  ========================= */
-
-  const updateStatus = async (id, status) => {
-    try {
-      await updateDoc(doc(db, "issues", id), {
-        status,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error("Update status error:", error);
-      alert("Unable to update issue status.");
-    }
-  };
-
-  /* =========================
-     LOGOUT
-  ========================= */
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
-  };
-
-  /* =========================
-     LOADING
-  ========================= */
-
-  if (authLoading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-box">
-          <div className="brand-icon">IT</div>
-          <h2>IssueTrack</h2>
-          <p>Loading...</p>
-        </div>
-      </div>
+  const updateStatus = (id, status) => {
+    setIssues(
+      issues.map((issue) =>
+        issue.id === id ? { ...issue, status } : issue
+      )
     );
-  }
-
-  /* =========================
-     LOGIN / REGISTER
-  ========================= */
-
-  if (!user) {
-    if (showRegister) {
-      return (
-        <Register
-          onRegister={(registeredUser) => {
-            setUser(registeredUser);
-            setShowRegister(false);
-          }}
-          onLogin={() => setShowRegister(false)}
-        />
-      );
-    }
-
-    return (
-      <Login
-        onLogin={(loggedInUser) => {
-          setUser(loggedInUser);
-        }}
-        onRegister={() => setShowRegister(true)}
-      />
-    );
-  }
-
-  /* =========================
-     MAIN APP
-  ========================= */
+  };
 
   return (
     <div className="app">
-
-      {/* ================= SIDEBAR ================= */}
-
+      {/* Sidebar */}
       <aside className="sidebar">
-
         <div className="brand">
           <div className="brand-icon">IT</div>
-
           <div>
             <h2>IssueTrack</h2>
             <span>Management Portal</span>
@@ -328,51 +141,28 @@ function App() {
         </div>
 
         <div className="workspace">
-
-          <div className="workspace-avatar">
-            {(user.email?.[0] || "U").toUpperCase()}
-          </div>
-
+          <div className="workspace-avatar">A</div>
           <div>
             <strong>My Workspace</strong>
             <span>Administrator</span>
           </div>
-
-          <span className="workspace-arrow">
-            ⌄
-          </span>
-
+          <span className="workspace-arrow">⌄</span>
         </div>
 
         <nav>
-
-          <p className="nav-title">
-            MAIN MENU
-          </p>
+          <p className="nav-title">MAIN MENU</p>
 
           <button
-            className={
-              activePage === "Dashboard"
-                ? "nav-item active"
-                : "nav-item"
-            }
-            onClick={() =>
-              setActivePage("Dashboard")
-            }
+            className={activePage === "Dashboard" ? "nav-item active" : "nav-item"}
+            onClick={() => setActivePage("Dashboard")}
           >
             <span>▦</span>
             Dashboard
           </button>
 
           <button
-            className={
-              activePage === "All Issues"
-                ? "nav-item active"
-                : "nav-item"
-            }
-            onClick={() =>
-              setActivePage("All Issues")
-            }
+            className={activePage === "All Issues" ? "nav-item active" : "nav-item"}
+            onClick={() => setActivePage("All Issues")}
           >
             <span>☷</span>
             All Issues
@@ -380,32 +170,19 @@ function App() {
           </button>
 
           <button
-            className={
-              activePage === "My Issues"
-                ? "nav-item active"
-                : "nav-item"
-            }
-            onClick={() =>
-              setActivePage("My Issues")
-            }
+            className={activePage === "My Issues" ? "nav-item active" : "nav-item"}
+            onClick={() => setActivePage("My Issues")}
           >
             <span>◎</span>
             My Issues
           </button>
 
-          <button
-            className="nav-item"
-            onClick={() =>
-              setShowModal(true)
-            }
-          >
+          <button className="nav-item" onClick={() => setShowModal(true)}>
             <span>＋</span>
             Create Issue
           </button>
 
-          <p className="nav-title second">
-            MANAGEMENT
-          </p>
+          <p className="nav-title second">MANAGEMENT</p>
 
           <button className="nav-item">
             <span>◫</span>
@@ -416,16 +193,11 @@ function App() {
             <span>⚙</span>
             Settings
           </button>
-
         </nav>
 
         <div className="sidebar-bottom">
-
           <div className="help-box">
-            <div className="help-icon">
-              ?
-            </div>
-
+            <div className="help-icon">?</div>
             <div>
               <strong>Need Help?</strong>
               <span>Contact support</span>
@@ -433,296 +205,174 @@ function App() {
           </div>
 
           <div className="user-card">
-
-            <div className="avatar">
-              {(user.email?.slice(0, 2) || "US").toUpperCase()}
-            </div>
-
+            <div className="avatar">AL</div>
             <div className="user-info">
-              <strong>
-                {user.email}
-              </strong>
-
-              <span>
-                Administrator
-              </span>
+              <strong>Anil Lama</strong>
+              <span>Administrator</span>
             </div>
-
-            <button
-              onClick={handleLogout}
-              className="logout-button"
-              title="Logout"
-            >
-              ↪
-            </button>
-
+            <span>•••</span>
           </div>
-
         </div>
-
       </aside>
 
-      {/* ================= MAIN ================= */}
-
+      {/* Main */}
       <main className="main">
-
-        {/* TOP BAR */}
-
         <header className="topbar">
-
           <div className="mobile-brand">
-            <div className="brand-icon">
-              IT
-            </div>
-
-            <strong>
-              IssueTrack
-            </strong>
+            <div className="brand-icon">IT</div>
+            <strong>IssueTrack</strong>
           </div>
 
           <div className="search-box">
-
             <span>⌕</span>
-
             <input
               type="text"
               placeholder="Search issues, IDs, assignees..."
               value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
+              onChange={(e) => setSearch(e.target.value)}
             />
-
-            <kbd>
-              Ctrl K
-            </kbd>
-
+            <kbd>Ctrl K</kbd>
           </div>
 
           <div className="top-actions">
-
-            <button className="icon-button">
-              ☼
-            </button>
-
+            <button className="icon-button">☼</button>
             <button className="icon-button notification">
               ♢
               <i></i>
             </button>
-
-            <div className="top-avatar">
-              {(user.email?.slice(0, 2) || "US").toUpperCase()}
-            </div>
-
+            <div className="top-avatar">AL</div>
           </div>
-
         </header>
 
-        {/* CONTENT */}
-
         <div className="content">
-
-          {/* ================= DASHBOARD ================= */}
-
-          {activePage === "Dashboard" && (
+          {activePage === "Dashboard" ? (
             <>
-
               <div className="page-header">
-
                 <div>
-
-                  <p className="eyebrow">
-                    OVERVIEW
-                  </p>
-
-                  <h1>
-                    Dashboard
-                  </h1>
-
+                  <p className="eyebrow">OVERVIEW</p>
+                  <h1>Dashboard</h1>
                   <p className="subtitle">
-                    Welcome back. Here's what's
-                    happening with your issues today.
+                    Welcome back, Anil. Here's what's happening with your
+                    issues today.
                   </p>
-
                 </div>
 
                 <button
                   className="primary-button"
-                  onClick={() =>
-                    setShowModal(true)
-                  }
+                  onClick={() => setShowModal(true)}
                 >
                   <span>＋</span>
                   Create Issue
                 </button>
-
               </div>
 
-              {/* STATS */}
-
+              {/* Stats */}
               <section className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-top">
+                    <span className="stat-label">TOTAL ISSUES</span>
+                    <div className="stat-icon purple">☷</div>
+                  </div>
+                  <strong>{stats.total}</strong>
+                  <div className="stat-change positive">↗ 12% <span>vs last month</span></div>
+                </div>
 
-                <StatCard
-                  label="TOTAL ISSUES"
-                  value={stats.total}
-                  icon="☷"
-                  iconClass="purple"
-                  change="↗ 12%"
-                  changeText="vs last month"
-                  changeClass="positive"
-                />
+                <div className="stat-card">
+                  <div className="stat-top">
+                    <span className="stat-label">OPEN</span>
+                    <div className="stat-icon orange">◷</div>
+                  </div>
+                  <strong>{stats.open}</strong>
+                  <div className="stat-change warning">● Needs attention</div>
+                </div>
 
-                <StatCard
-                  label="OPEN"
-                  value={stats.open}
-                  icon="◷"
-                  iconClass="orange"
-                  change="●"
-                  changeText="Needs attention"
-                  changeClass="warning"
-                />
+                <div className="stat-card">
+                  <div className="stat-top">
+                    <span className="stat-label">IN PROGRESS</span>
+                    <div className="stat-icon blue">◌</div>
+                  </div>
+                  <strong>{stats.progress}</strong>
+                  <div className="stat-change neutral">● Being worked on</div>
+                </div>
 
-                <StatCard
-                  label="IN PROGRESS"
-                  value={stats.progress}
-                  icon="◌"
-                  iconClass="blue"
-                  change="●"
-                  changeText="Being worked on"
-                  changeClass="neutral"
-                />
+                <div className="stat-card">
+                  <div className="stat-top">
+                    <span className="stat-label">RESOLVED</span>
+                    <div className="stat-icon green">✓</div>
+                  </div>
+                  <strong>{stats.resolved}</strong>
+                  <div className="stat-change positive">↗ 8% <span>this week</span></div>
+                </div>
 
-                <StatCard
-                  label="RESOLVED"
-                  value={stats.resolved}
-                  icon="✓"
-                  iconClass="green"
-                  change="↗ 8%"
-                  changeText="this week"
-                  changeClass="positive"
-                />
-
-                <StatCard
-                  label="CRITICAL"
-                  value={stats.critical}
-                  icon="!"
-                  iconClass="red"
-                  change="●"
-                  changeText="High priority"
-                  changeClass="danger"
-                  critical
-                />
-
+                <div className="stat-card critical-card">
+                  <div className="stat-top">
+                    <span className="stat-label">CRITICAL</span>
+                    <div className="stat-icon red">!</div>
+                  </div>
+                  <strong>{stats.critical}</strong>
+                  <div className="stat-change danger">● High priority</div>
+                </div>
               </section>
 
-              {/* RECENT ISSUES */}
-
+              {/* Issue Section */}
               <section className="issues-section">
-
                 <div className="section-header">
-
                   <div>
-                    <h2>
-                      Recent Issues
-                    </h2>
-
-                    <p>
-                      Latest issues reported by your team
-                    </p>
+                    <h2>Recent Issues</h2>
+                    <p>Latest issues reported by your team</p>
                   </div>
 
                   <button
                     className="view-all"
-                    onClick={() =>
-                      setActivePage("All Issues")
-                    }
+                    onClick={() => setActivePage("All Issues")}
                   >
                     View all →
                   </button>
-
                 </div>
 
                 <IssueTable
                   issues={filteredIssues.slice(0, 5)}
                   updateStatus={updateStatus}
                 />
-
               </section>
-
             </>
-          )}
-
-          {/* ================= ALL ISSUES ================= */}
-
-          {activePage === "All Issues" && (
+          ) : activePage === "All Issues" ? (
             <>
-
               <div className="page-header">
-
                 <div>
-
-                  <p className="eyebrow">
-                    ISSUE MANAGEMENT
-                  </p>
-
-                  <h1>
-                    All Issues
-                  </h1>
-
+                  <p className="eyebrow">ISSUE MANAGEMENT</p>
+                  <h1>All Issues</h1>
                   <p className="subtitle">
                     Manage and track all reported issues.
                   </p>
-
                 </div>
 
                 <button
                   className="primary-button"
-                  onClick={() =>
-                    setShowModal(true)
-                  }
+                  onClick={() => setShowModal(true)}
                 >
                   ＋ Create Issue
                 </button>
-
               </div>
 
               <div className="filter-bar">
-
                 <div className="filter-search">
-
                   <span>⌕</span>
-
                   <input
                     placeholder="Search issues..."
                     value={search}
-                    onChange={(event) =>
-                      setSearch(event.target.value)
-                    }
+                    onChange={(e) => setSearch(e.target.value)}
                   />
-
                 </div>
 
                 <select
                   value={statusFilter}
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value)
-                  }
+                  onChange={(e) => setStatusFilter(e.target.value)}
                 >
-                  <option value="All">
-                    All
-                  </option>
-
-                  <option value="Open">
-                    Open
-                  </option>
-
-                  <option value="In Progress">
-                    In Progress
-                  </option>
-
-                  <option value="Resolved">
-                    Resolved
-                  </option>
+                  <option>All</option>
+                  <option>Open</option>
+                  <option>In Progress</option>
+                  <option>Resolved</option>
                 </select>
 
                 <button
@@ -734,388 +384,182 @@ function App() {
                 >
                   Reset
                 </button>
-
               </div>
 
               <section className="issues-section full">
-
                 <IssueTable
                   issues={filteredIssues}
                   updateStatus={updateStatus}
                 />
-
               </section>
-
             </>
-          )}
-
-          {/* ================= MY ISSUES ================= */}
-
-          {activePage === "My Issues" && (
+          ) : (
             <>
-
               <div className="page-header">
-
                 <div>
-
-                  <p className="eyebrow">
-                    PERSONAL WORKSPACE
-                  </p>
-
-                  <h1>
-                    My Issues
-                  </h1>
-
+                  <p className="eyebrow">PERSONAL WORKSPACE</p>
+                  <h1>My Issues</h1>
                   <p className="subtitle">
                     Issues currently assigned to you.
                   </p>
-
                 </div>
-
               </div>
 
               <section className="issues-section full">
-
                 <IssueTable
                   issues={issues.filter(
-                    (issue) =>
-                      issue.assignee === "Anil Lama"
+                    (issue) => issue.assignee === "Anil Lama"
                   )}
                   updateStatus={updateStatus}
                 />
-
               </section>
-
             </>
           )}
-
         </div>
-
       </main>
 
-      {/* ================= CREATE ISSUE MODAL ================= */}
-
+      {/* Modal */}
       {showModal && (
-        <div
-          className="modal-overlay"
-          onClick={() =>
-            setShowModal(false)
-          }
-        >
-
-          <div
-            className="modal"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-
               <div>
-
-                <p className="eyebrow">
-                  NEW ISSUE
-                </p>
-
-                <h2>
-                  Create New Issue
-                </h2>
-
+                <p className="eyebrow">NEW ISSUE</p>
+                <h2>Create New Issue</h2>
               </div>
 
               <button
                 className="close-button"
-                onClick={() =>
-                  setShowModal(false)
-                }
+                onClick={() => setShowModal(false)}
               >
                 ×
               </button>
-
             </div>
 
-            <form
-              onSubmit={handleCreateIssue}
-            >
-
+            <form onSubmit={handleCreateIssue}>
               <label>
-
                 Issue Title
-
                 <input
                   type="text"
                   placeholder="Enter issue title"
                   value={newIssue.title}
-                  onChange={(event) =>
-                    setNewIssue({
-                      ...newIssue,
-                      title: event.target.value,
-                    })
+                  onChange={(e) =>
+                    setNewIssue({ ...newIssue, title: e.target.value })
                   }
                   required
                 />
-
               </label>
 
               <label>
-
                 Description
-
                 <textarea
                   placeholder="Describe the issue..."
                   rows="4"
                   value={newIssue.description}
-                  onChange={(event) =>
+                  onChange={(e) =>
                     setNewIssue({
                       ...newIssue,
-                      description: event.target.value,
+                      description: e.target.value,
                     })
                   }
                 />
-
               </label>
 
               <div className="form-grid">
-
                 <label>
-
                   Priority
-
                   <select
                     value={newIssue.priority}
-                    onChange={(event) =>
+                    onChange={(e) =>
                       setNewIssue({
                         ...newIssue,
-                        priority: event.target.value,
+                        priority: e.target.value,
                       })
                     }
                   >
-                    <option value="Critical">
-                      Critical
-                    </option>
-
-                    <option value="High">
-                      High
-                    </option>
-
-                    <option value="Medium">
-                      Medium
-                    </option>
-
-                    <option value="Low">
-                      Low
-                    </option>
-
+                    <option>Critical</option>
+                    <option>High</option>
+                    <option>Medium</option>
+                    <option>Low</option>
                   </select>
-
                 </label>
 
                 <label>
-
                   Category
-
                   <select
                     value={newIssue.category}
-                    onChange={(event) =>
+                    onChange={(e) =>
                       setNewIssue({
                         ...newIssue,
-                        category: event.target.value,
+                        category: e.target.value,
                       })
                     }
                   >
-
-                    <option value="General">
-                      General
-                    </option>
-
-                    <option value="Authentication">
-                      Authentication
-                    </option>
-
-                    <option value="Payment">
-                      Payment
-                    </option>
-
-                    <option value="UI/UX">
-                      UI/UX
-                    </option>
-
-                    <option value="Performance">
-                      Performance
-                    </option>
-
-                    <option value="Technical">
-                      Technical
-                    </option>
-
+                    <option>General</option>
+                    <option>Authentication</option>
+                    <option>Payment</option>
+                    <option>UI/UX</option>
+                    <option>Performance</option>
+                    <option>Technical</option>
                   </select>
-
                 </label>
-
               </div>
 
               <label>
-
                 Assign To
-
                 <select
                   value={newIssue.assignee}
-                  onChange={(event) =>
+                  onChange={(e) =>
                     setNewIssue({
                       ...newIssue,
-                      assignee: event.target.value,
+                      assignee: e.target.value,
                     })
                   }
                 >
-
-                  <option value="Unassigned">
-                    Unassigned
-                  </option>
-
-                  <option value="Anil Lama">
-                    Anil Lama
-                  </option>
-
-                  <option value="Sujan">
-                    Sujan
-                  </option>
-
-                  <option value="Ramesh">
-                    Ramesh
-                  </option>
-
-                  <option value="Bikash">
-                    Bikash
-                  </option>
-
+                  <option>Unassigned</option>
+                  <option>Anil Lama</option>
+                  <option>Sujan</option>
+                  <option>Ramesh</option>
+                  <option>Bikash</option>
                 </select>
-
               </label>
 
               <div className="modal-actions">
-
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() =>
-                    setShowModal(false)
-                  }
+                  onClick={() => setShowModal(false)}
                 >
                   Cancel
                 </button>
 
-                <button
-                  type="submit"
-                  className="primary-button"
-                >
+                <button type="submit" className="primary-button">
                   Create Issue
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
       )}
-
     </div>
   );
 }
 
-/* =========================
-   STAT CARD
-========================= */
-
-function StatCard({
-  label,
-  value,
-  icon,
-  iconClass,
-  change,
-  changeText,
-  changeClass,
-  critical = false,
-}) {
-  return (
-    <div
-      className={
-        critical
-          ? "stat-card critical-card"
-          : "stat-card"
-      }
-    >
-
-      <div className="stat-top">
-
-        <span className="stat-label">
-          {label}
-        </span>
-
-        <div
-          className={`stat-icon ${iconClass}`}
-        >
-          {icon}
-        </div>
-
-      </div>
-
-      <strong>
-        {value}
-      </strong>
-
-      <div
-        className={`stat-change ${changeClass}`}
-      >
-        {change}{" "}
-
-        <span>
-          {changeText}
-        </span>
-
-      </div>
-
-    </div>
-  );
-}
-
-/* =========================
-   ISSUE TABLE
-========================= */
-
-function IssueTable({
-  issues,
-  updateStatus,
-}) {
-  if (!issues || issues.length === 0) {
+function IssueTable({ issues, updateStatus }) {
+  if (issues.length === 0) {
     return (
       <div className="empty-state">
-
-        <div>
-          ☷
-        </div>
-
-        <h3>
-          No issues found
-        </h3>
-
-        <p>
-          Try changing your search or filter.
-        </p>
-
+        <div>☷</div>
+        <h3>No issues found</h3>
+        <p>Try changing your search or filter.</p>
       </div>
     );
   }
 
   return (
     <div className="table-wrapper">
-
       <table>
-
         <thead>
-
           <tr>
             <th>ISSUE</th>
             <th>PRIORITY</th>
@@ -1124,146 +568,65 @@ function IssueTable({
             <th>CREATED</th>
             <th>ACTION</th>
           </tr>
-
         </thead>
 
         <tbody>
+          {issues.map((issue) => (
+            <tr key={issue.id}>
+              <td>
+                <div className="issue-title">
+                  <span className="issue-id">{issue.id}</span>
+                  <strong>{issue.title}</strong>
+                  <small>{issue.category}</small>
+                </div>
+              </td>
 
-          {issues.map((issue) => {
+              <td>
+                <span className={`priority ${issue.priority.toLowerCase()}`}>
+                  <i></i>
+                  {issue.priority}
+                </span>
+              </td>
 
-            const priorityClass =
-              issue.priority
-                ?.toLowerCase()
-                ?.replace(/\s+/g, "-") || "";
+              <td>
+                <select
+                  className={`status-select ${issue.status
+                    .toLowerCase()
+                    .replace(" ", "-")}`}
+                  value={issue.status}
+                  onChange={(e) =>
+                    updateStatus(issue.id, e.target.value)
+                  }
+                >
+                  <option>Open</option>
+                  <option>In Progress</option>
+                  <option>Resolved</option>
+                </select>
+              </td>
 
-            const statusClass =
-              issue.status
-                ?.toLowerCase()
-                ?.replace(/\s+/g, "-") || "";
-
-            const initials =
-              issue.assignee &&
-              issue.assignee !== "Unassigned"
-                ? issue.assignee
-                    .split(" ")
-                    .map((name) => name[0])
-                    .join("")
-                : "?";
-
-            return (
-              <tr key={issue.id}>
-
-                <td>
-
-                  <div className="issue-title">
-
-                    <span className="issue-id">
-                      {issue.id}
-                    </span>
-
-                    <strong>
-                      {issue.title}
-                    </strong>
-
-                    <small>
-                      {issue.category}
-                    </small>
-
+              <td>
+                <div className="assignee">
+                  <div className="small-avatar">
+                    {issue.assignee === "Unassigned"
+                      ? "?"
+                      : issue.assignee
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
                   </div>
+                  <span>{issue.assignee}</span>
+                </div>
+              </td>
 
-                </td>
+              <td className="date">{issue.date}</td>
 
-                <td>
-
-                  <span
-                    className={
-                      "priority " +
-                      priorityClass
-                    }
-                  >
-
-                    <i></i>
-
-                    {issue.priority}
-
-                  </span>
-
-                </td>
-
-                <td>
-
-                  <select
-                    className={
-                      "status-select " +
-                      statusClass
-                    }
-                    value={
-                      issue.status || "Open"
-                    }
-                    onChange={(event) =>
-                      updateStatus(
-                        issue.id,
-                        event.target.value
-                      )
-                    }
-                  >
-
-                    <option value="Open">
-                      Open
-                    </option>
-
-                    <option value="In Progress">
-                      In Progress
-                    </option>
-
-                    <option value="Resolved">
-                      Resolved
-                    </option>
-
-                  </select>
-
-                </td>
-
-                <td>
-
-                  <div className="assignee">
-
-                    <div className="small-avatar">
-                      {initials}
-                    </div>
-
-                    <span>
-                      {issue.assignee ||
-                        "Unassigned"}
-                    </span>
-
-                  </div>
-
-                </td>
-
-                <td className="date">
-                  {issue.date || "—"}
-                </td>
-
-                <td>
-
-                  <button
-                    className="more-button"
-                    type="button"
-                  >
-                    •••
-                  </button>
-
-                </td>
-
-              </tr>
-            );
-          })}
-
+              <td>
+                <button className="more-button">•••</button>
+              </td>
+            </tr>
+          ))}
         </tbody>
-
       </table>
-
     </div>
   );
 }
