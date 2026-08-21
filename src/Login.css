@@ -1,230 +1,152 @@
-/* Login Page Layout & Styling */
-.auth-page {
+.auth-container {
   min-height: 100vh;
   display: flex;
-  align-items: center;
   justify-content: center;
-  background-color: #0b0f19;
-  color: #f8fafc;
+  align-items: center;
+  background-color: #2b2b2b;
+  perspective: 1000px;
+  font-family: sans-serif;
+}
+
+.auth-flip-box {
+  width: 480px;
+  height: 480px;
   position: relative;
-  overflow: hidden;
-  font-family: system-ui, -apple-system, sans-serif;
+  transition: transform 0.8s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
 }
 
-.auth-background {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.auth-flip-box.flipped {
+  transform: rotateY(180deg);
 }
 
-.auth-orb {
+.auth-face {
   position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.auth-back {
+  transform: rotateY(180deg);
+}
+
+.circle-border {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
-}
-
-.auth-orb-one {
-  width: 300px;
-  height: 300px;
-  background: #6366f1;
-  top: -50px;
-  left: -50px;
-}
-
-.auth-orb-two {
-  width: 400px;
-  height: 400px;
-  background: #a855f7;
-  bottom: -100px;
-  right: -100px;
-}
-
-.auth-container {
-  display: grid;
-  grid-template-columns: 1fr;
-  max-width: 1000px;
-  width: 90%;
-  margin: 20px;
-  background: rgba(18, 24, 38, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
-}
-
-@media (min-width: 768px) {
-  .auth-container {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.auth-brand-section {
-  padding: 40px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1));
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border: 12px solid #14a3e3;
+  background-color: #2b2b2b;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-}
-
-.auth-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.auth-brand-icon {
-  width: 40px;
-  height: 40px;
-  background: #6366f1;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
   justify-content: center;
-  font-weight: bold;
+  align-items: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  padding: 30px;
+  box-sizing: border-box;
 }
 
-.auth-hero-content h1 {
+.title {
+  color: #14a3e3;
   font-size: 2.5rem;
-  line-height: 1.1;
-  margin: 20px 0;
+  font-weight: 400;
+  margin-bottom: 20px;
 }
 
-.gradient-text {
-  background: linear-gradient(to right, #6366f1, #a855f7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.auth-form-section {
-  padding: 40px;
-}
-
-.login-card h2 {
-  font-size: 1.8rem;
-  margin-bottom: 8px;
-}
-
-.login-form {
+.auth-form {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  margin-top: 20px;
+  align-items: center;
+  width: 70%;
 }
 
-.auth-field {
+.input-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.auth-field label {
-  font-size: 0.875rem;
-  color: #94a3b8;
-}
-
-.input-wrapper {
-  position: relative;
-  display: flex;
   align-items: center;
-}
-
-.input-wrapper input {
   width: 100%;
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #fff;
-  font-size: 0.95rem;
-  outline: none;
-}
-
-.input-wrapper input:focus {
-  border-color: #6366f1;
-}
-
-.password-toggle {
-  position: absolute;
-  right: 12px;
-  background: none;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  font-size: 0.8rem;
-}
-
-.login-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
-}
-
-.remember-me {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  color: #94a3b8;
-}
-
-.forgot-password {
-  background: none;
-  border: none;
-  color: #6366f1;
-  cursor: pointer;
-}
-
-.login-submit, .register-button {
-  padding: 12px;
-  border-radius: 8px;
-  border: none;
-  font-weight: bold;
-  cursor: pointer;
-  width: 100%;
-  transition: background 0.2s;
-}
-
-.login-submit {
-  background: #6366f1;
-  color: white;
-}
-
-.login-submit:hover {
-  background: #4f46e5;
-}
-
-.register-button {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-}
-
-.auth-alert {
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 0.85rem;
   margin-bottom: 15px;
 }
 
-.auth-alert-error {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
+.input-group label {
+  color: #14a3e3;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
 }
 
-.auth-alert-success {
-  background: rgba(34, 197, 94, 0.15);
-  border: 1px solid rgba(34, 197, 94, 0.3);
-  color: #86efac;
-}
-
-.auth-divider {
+.input-group input {
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 25px;
+  background-color: #14a3e3;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  outline: none;
   text-align: center;
-  margin: 20px 0;
-  color: #64748b;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.options-group {
+  display: flex;
+  justify-content: space-between;
+  width: 80%;
+  margin-bottom: 15px;
+  align-items: center;
+}
+
+.checkbox-custom {
+  width: 16px;
+  height: 16px;
+  background-color: #14a3e3;
+  display: inline-block;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.remember input { display: none; }
+
+.forgot-text {
+  color: #14a3e3;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.forgot-text:hover { text-decoration: underline; }
+
+.go-btn {
+  padding: 10px 40px;
+  border-radius: 20px;
+  background-color: #14a3e3;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.reg-btn { margin-top: 5px; }
+.register-form .input-group { margin-bottom: 10px; }
+
+.switch-text {
+  margin-top: 20px;
+  color: #888;
   font-size: 0.85rem;
 }
+.switch-text span {
+  color: #14a3e3;
+  cursor: pointer;
+  font-weight: bold;
+  margin-left: 5px;
+}
+
+.alert {
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.alert-red { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.alert-green { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
