@@ -1,26 +1,44 @@
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from "firebase/auth";
 import { auth } from "./firebase";
+import "./App.css";
 
 function Login({ onLogin, onRegister }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  
+  // Status state handles both error and success messages
+  const [status, setStatus] = useState({ type: "", text: "" });
+
+  const clearStatus = () => setStatus({ type: "", text: "" });
 
   const handleLogin = async (e) => {
     e.preventDefault();
-
-    setError("");
+    clearStatus();
 
     if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
+      setStatus({ type: "error", text: "Please enter both email and password." });
       return;
     }
 
     try {
       setLoading(true);
+
+      // Apply persistence based on 'Remember me' checkbox
+      const persistenceType = rememberMe
+        ? browserLocalPersistence
+        : browserSessionPersistence;
+      await setPersistence(auth, persistenceType);
 
       const result = await signInWithEmailAndPassword(
         auth,
@@ -36,125 +54,138 @@ function Login({ onLogin, onRegister }) {
         case "auth/invalid-credential":
         case "auth/wrong-password":
         case "auth/user-not-found":
-          setError("Invalid email or password.");
+          setStatus({ type: "error", text: "Invalid email or password." });
           break;
-
         case "auth/invalid-email":
-          setError("Please enter a valid email address.");
+          setStatus({ type: "error", text: "Please enter a valid email address." });
           break;
-
         case "auth/too-many-requests":
-          setError(
-            "Too many login attempts. Please try again later."
-          );
+          setStatus({
+            type: "error",
+            text: "Too many login attempts. Please try again later.",
+          });
           break;
-
         case "auth/network-request-failed":
-          setError(
-            "Network error. Please check your internet connection."
-          );
+          setStatus({
+            type: "error",
+            text: "Network error. Please check your connection.",
+          });
           break;
-
         default:
-          setError("Unable to sign in. Please try again.");
+          setStatus({ type: "error", text: "Unable to sign in. Please try again." });
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleForgotPassword = async () => {
+    clearStatus();
+
+    if (!email.trim()) {
+      setStatus({
+        type: "error",
+        text: "Please enter your email address first to reset password.",
+      });
+      return;
+    }
+
+    try {
+      setResetLoading(true);
+      await sendPasswordResetEmail(auth, email.trim());
+      setStatus({
+        type: "success",
+        text: `Password reset link sent to ${email.trim()}. Check your inbox!`,
+      });
+    } catch (error) {
+      console.error("Reset error:", error);
+      if (error.code === "auth/invalid-email") {
+        setStatus({ type: "error", text: "Please enter a valid email address." });
+      } else {
+        setStatus({
+          type: "error",
+          text: "Failed to send reset email. Verify your email address.",
+        });
+      }
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <div className="auth-page">
-
-      {/* Background decoration */}
+      {/* Dynamic background glow */}
       <div className="auth-background">
         <div className="auth-orb auth-orb-one"></div>
         <div className="auth-orb auth-orb-two"></div>
         <div className="auth-grid"></div>
       </div>
 
-      {/* Main content */}
       <div className="auth-container">
-
-        {/* Left branding section */}
+        {/* Branding Hero Section */}
         <section className="auth-brand-section">
-
           <div className="auth-brand">
-
             <div className="auth-brand-icon">
               <span>IT</span>
             </div>
-
-            <div>
+            <div className="auth-brand-text">
               <strong>IssueTrack</strong>
               <span>Management Portal</span>
             </div>
-
           </div>
 
           <div className="auth-hero-content">
-
             <div className="auth-badge">
               <span className="status-dot"></span>
-              Issue management made simple
+              Modern Issue Tracking Platform
             </div>
 
             <h1>
-              Track.
-              <br />
-              Manage.
-              <br />
-              <span>Resolve.</span>
+              Track. <br />
+              Manage. <br />
+              <span className="gradient-text">Resolve.</span>
             </h1>
 
             <p>
-              A modern issue tracking platform designed to help
-              teams report, manage, assign and resolve issues faster.
+              A powerful workspace designed to help teams report, manage, assign,
+              and resolve issues effortlessly.
             </p>
 
             <div className="auth-features">
-
               <div className="auth-feature">
                 <div className="feature-icon">✓</div>
                 <div>
-                  <strong>Centralized Issue Management</strong>
-                  <span>Keep every issue organized in one place.</span>
+                  <strong>Centralized Hub</strong>
+                  <span>Keep every ticket organized in real-time.</span>
                 </div>
               </div>
 
               <div className="auth-feature">
-                <div className="feature-icon">↗</div>
+                <div className="feature-icon">⚡</div>
                 <div>
-                  <strong>Real-time Updates</strong>
-                  <span>Stay synchronized with your entire team.</span>
+                  <strong>Instant Updates</strong>
+                  <span>Stay synchronized with instant team notifications.</span>
                 </div>
               </div>
 
               <div className="auth-feature">
-                <div className="feature-icon">◎</div>
+                <div className="feature-icon">🛡️</div>
                 <div>
-                  <strong>Team Collaboration</strong>
-                  <span>Assign and track issues effortlessly.</span>
+                  <strong>Enterprise Security</strong>
+                  <span>Role-based access and data protection built-in.</span>
                 </div>
               </div>
-
             </div>
-
           </div>
 
           <div className="auth-footer-brand">
-            © 2026 IssueTrack. All rights reserved.
+            © 2026 IssueTrack Inc. All rights reserved.
           </div>
-
         </section>
 
-
-        {/* Login section */}
+        {/* Form Card Section */}
         <section className="auth-form-section">
-
           <div className="login-card">
-
-            {/* Logo */}
             <div className="login-logo-wrapper">
               <div className="login-logo">
                 <span>IT</span>
@@ -162,158 +193,103 @@ function Login({ onLogin, onRegister }) {
             </div>
 
             <div className="login-heading">
-
               <h2>Welcome back</h2>
-
-              <p>
-                Sign in to continue to your workspace
-              </p>
-
+              <p>Sign in to access your workspace</p>
             </div>
 
-
-            {/* Error */}
-            {error && (
-              <div className="auth-error">
-
-                <div className="auth-error-icon">
-                  !
+            {/* Error / Success Banners */}
+            {status.text && (
+              <div className={`auth-alert auth-alert-${status.type}`}>
+                <div className="auth-alert-icon">
+                  {status.type === "error" ? "!" : "✓"}
                 </div>
-
                 <div>
-                  <strong>Sign in failed</strong>
-                  <span>{error}</span>
+                  <strong>{status.type === "error" ? "Error" : "Success"}</strong>
+                  <span>{status.text}</span>
                 </div>
-
               </div>
             )}
 
-
-            {/* Form */}
-            <form
-              className="login-form"
-              onSubmit={handleLogin}
-            >
-
-              {/* Email */}
+            <form className="login-form" onSubmit={handleLogin}>
+              {/* Email Input */}
               <div className="auth-field">
-
-                <label htmlFor="email">
-                  Email address
-                </label>
-
+                <label htmlFor="email">Email address</label>
                 <div className="input-wrapper">
-
-                  <span className="input-icon">
-                    @
-                  </span>
-
+                  <span className="input-icon">✉</span>
                   <input
                     id="email"
                     type="email"
-                    placeholder="you@example.com"
+                    placeholder="name@company.com"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
-                      setError("");
+                      clearStatus();
                     }}
                     autoComplete="email"
                     disabled={loading}
                     required
                   />
-
                 </div>
-
               </div>
 
-
-              {/* Password */}
+              {/* Password Input */}
               <div className="auth-field">
-
-                <div className="field-header">
-
-                  <label htmlFor="password">
-                    Password
-                  </label>
-
-                </div>
-
+                <label htmlFor="password">Password</label>
                 <div className="input-wrapper">
-
-                  <span className="input-icon">
-                    •••
-                  </span>
-
+                  <span className="input-icon">🔒</span>
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
-                      setError("");
+                      clearStatus();
                     }}
                     autoComplete="current-password"
                     disabled={loading}
                     required
                   />
-
                   <button
                     type="button"
                     className="password-toggle"
-                    onClick={() =>
-                      setShowPassword(!showPassword)
-                    }
+                    onClick={() => setShowPassword(!showPassword)}
                     disabled={loading}
-                    aria-label={
-                      showPassword
-                        ? "Hide password"
-                        : "Show password"
-                    }
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? "Hide" : "Show"}
                   </button>
-
                 </div>
-
               </div>
 
-
-              {/* Remember / Forgot */}
+              {/* Options */}
               <div className="login-options">
-
                 <label className="remember-me">
-
-                  <input type="checkbox" />
-
-                  <span>
-                    Remember me
-                  </span>
-
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={loading}
+                  />
+                  <span>Remember me</span>
                 </label>
 
                 <button
                   type="button"
                   className="forgot-password"
-                  onClick={() =>
-                    setError(
-                      "Password reset can be added using Firebase Password Reset."
-                    )
-                  }
+                  onClick={handleForgotPassword}
+                  disabled={loading || resetLoading}
                 >
-                  Forgot password?
+                  {resetLoading ? "Sending..." : "Forgot password?"}
                 </button>
-
               </div>
 
-
-              {/* Submit */}
+              {/* Submit Button */}
               <button
                 type="submit"
                 className="login-submit"
                 disabled={loading}
               >
-
                 {loading ? (
                   <>
                     <span className="loading-spinner"></span>
@@ -322,24 +298,16 @@ function Login({ onLogin, onRegister }) {
                 ) : (
                   <>
                     Sign in
-                    <span className="submit-arrow">
-                      →
-                    </span>
+                    <span className="submit-arrow">→</span>
                   </>
                 )}
-
               </button>
-
             </form>
 
-
-            {/* Divider */}
             <div className="auth-divider">
               <span>New to IssueTrack?</span>
             </div>
 
-
-            {/* Register */}
             <button
               type="button"
               className="register-button"
@@ -350,21 +318,12 @@ function Login({ onLogin, onRegister }) {
               <span>→</span>
             </button>
 
-
             <p className="login-security">
-
-              <span>🔒</span>
-
-              Your account is protected by Firebase Authentication.
-
+              <span>🔒</span> Secured with Firebase 256-bit Encryption
             </p>
-
           </div>
-
         </section>
-
       </div>
-
     </div>
   );
 }
