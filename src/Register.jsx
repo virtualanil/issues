@@ -1,200 +1,102 @@
 import { useState } from "react";
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from "firebase/auth";
-import {
-  doc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "./firebase";
 
-import { auth, db } from "./firebase";
-
-function Register({ onRegister, onLogin }) {
-  const [name, setName] = useState("");
+function Register({ onBackToLogin }) {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleRegister = async (e) => {
     e.preventDefault();
-
     setError("");
 
-    if (!name.trim()) {
-      setError("Please enter your name.");
+    if (password !== confirmPassword) {
+      setError("Passwords do not match!");
       return;
     }
-
-    if (!email.trim()) {
-      setError("Please enter your email.");
-      return;
-    }
-
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-
     try {
       setLoading(true);
-
-      const credential =
-        await createUserWithEmailAndPassword(
-          auth,
-          email.trim(),
-          password
-        );
-
-      const user = credential.user;
-
-      // Save name in Firebase Authentication
-      await updateProfile(user, {
-        displayName: name.trim(),
-      });
-
-      // Create user profile in Firestore
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          uid: user.uid,
-          name: name.trim(),
-          email: user.email,
-          role: "user",
-          createdAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      if (onRegister) {
-        onRegister({
-          ...user,
-          displayName: name.trim(),
-        });
-      }
+      await createUserWithEmailAndPassword(auth, email.trim(), password);
+      // Firebase will auto-login after creation, triggering App.jsx state change
     } catch (err) {
-      console.error("Registration error:", err);
-
-      let message = "Unable to create account.";
-
-      if (err.code === "auth/email-already-in-use") {
-        message = "This email is already registered.";
-      } else if (err.code === "auth/invalid-email") {
-        message = "Please enter a valid email address.";
-      } else if (err.code === "auth/weak-password") {
-        message = "Password is too weak.";
-      }
-
-      setError(message);
-    } finally {
+      setError(err.message.replace("Firebase: ", ""));
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-logo">IT</div>
-
-        <div className="auth-header">
-          <p className="eyebrow">ISSUETRACK</p>
-          <h1>Create Account</h1>
-          <p>
-            Create your account to manage and track issues.
-          </p>
+    <div className="auth-wrapper">
+      <div className="auth-box register-box">
+        <div className="brand-header">
+          <div className="logo-icon">IT</div>
+          <h2>Create <span className="highlight">Account</span></h2>
         </div>
+        <p className="auth-subtitle">Join IssueTrack to start managing tasks.</p>
 
-        {error && (
-          <div className="auth-error">
-            {error}
+        {error && <div className="alert-box alert-error">{error}</div>}
+
+        <form onSubmit={handleRegister}>
+          <div className="input-group">
+            <label>Full Name</label>
+            <input 
+              type="text" 
+              placeholder="John Doe" 
+              value={fullName} 
+              onChange={(e) => setFullName(e.target.value)} 
+              required 
+            />
           </div>
-        )}
 
-        <form
-          className="auth-form"
-          onSubmit={handleRegister}
-        >
-          <label>
-            Full Name
-
-            <input
-              type="text"
-              placeholder="Enter your full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
-              required
+          <div className="input-group">
+            <label>Email Address</label>
+            <input 
+              type="email" 
+              placeholder="name@company.com" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              required 
             />
-          </label>
+          </div>
 
-          <label>
-            Email Address
+          <div className="form-row">
+            <div className="input-group">
+              <label>Password</label>
+              <input 
+                type="password" 
+                placeholder="Min. 6 chars" 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                required 
+              />
+            </div>
+            <div className="input-group">
+              <label>Confirm Password</label>
+              <input 
+                type="password" 
+                placeholder="Repeat password" 
+                value={confirmPassword} 
+                onChange={(e) => setConfirmPassword(e.target.value)} 
+                required 
+              />
+            </div>
+          </div>
 
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              required
-            />
-          </label>
-
-          <label>
-            Password
-
-            <input
-              type="password"
-              placeholder="Minimum 6 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              required
-            />
-          </label>
-
-          <label>
-            Confirm Password
-
-            <input
-              type="password"
-              placeholder="Confirm your password"
-              value={confirmPassword}
-              onChange={(e) =>
-                setConfirmPassword(e.target.value)
-              }
-              autoComplete="new-password"
-              required
-            />
-          </label>
-
-          <button
-            type="submit"
-            className="primary-button auth-submit"
-            disabled={loading}
-          >
-            {loading ? "Creating Account..." : "Create Account"}
+          <button type="submit" className="auth-btn" disabled={loading}>
+            {loading ? "Creating account..." : "Create Account →"}
           </button>
         </form>
 
-        <div className="auth-switch">
-          <span>Already have an account?</span>
-
-          <button
-            type="button"
-            onClick={onLogin}
-          >
-            Sign in
-          </button>
+        <div className="auth-footer">
+          Already have an account? <span onClick={onBackToLogin}>Sign In</span>
         </div>
       </div>
     </div>
