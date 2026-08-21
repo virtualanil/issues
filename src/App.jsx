@@ -1,4 +1,3 @@
-# Firebase Login + Issue Tracking App.jsx
 
 ```jsx
 import { useEffect, useMemo, useState } from "react";
