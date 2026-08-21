@@ -1,93 +1,180 @@
 import { useState } from "react";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail 
+} from "firebase/auth";
 import { auth } from "./firebase";
+import "./Login.css";
 
-function Login({ onRegister }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export default function Login() {
+  const [isFlipped, setIsFlipped] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  
   const [error, setError] = useState("");
-  const [msg, setMsg] = useState(""); // Success message for password reset
+  const [msg, setMsg] = useState("");
+
+  const clearMessages = () => {
+    setError("");
+    setMsg("");
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError("");
-    setMsg("");
+    clearMessages();
     try {
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
     } catch (err) {
-      setError("Invalid credentials. Please check your details.");
+      setError("Invalid Email or Password!");
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    clearMessages();
+    if (regPassword.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    try {
+      setLoading(true);
+      await createUserWithEmailAndPassword(auth, regEmail, regPassword);
+    } catch (err) {
+      setError(err.message.replace("Firebase: ", ""));
       setLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
-    setError("");
-    setMsg("");
-    if (!email.trim()) {
-      setError("Please enter your email address first to reset your password.");
+    clearMessages();
+    if (!loginEmail.trim()) {
+      setError("User Name (Email) पहिला हाल्नुहोस्!");
       return;
     }
     try {
-      await sendPasswordResetEmail(auth, email.trim());
-      setMsg("Password reset link sent to your email!");
+      await sendPasswordResetEmail(auth, loginEmail);
+      setMsg("Reset link sent to your email!");
     } catch (err) {
-      setError("Failed to send reset email. Make sure the email is correct.");
+      setError("Failed to send reset email.");
     }
   };
 
   return (
-    <div className="auth-wrapper">
-      <div className="auth-box">
-        <div className="brand-header">
-          <div className="logo-icon">IT</div>
-          <h2>Sign In to <span className="highlight">IssueTrack</span></h2>
-        </div>
-        <p className="auth-subtitle">Welcome back! Manage your workspace issues.</p>
+    <div className="auth-container">
+      <div className={`auth-flip-box ${isFlipped ? "flipped" : ""}`}>
+        
+        {/* FRONT: LOGIN */}
+        <div className="auth-face auth-front">
+          <div className="circle-border">
+            <h2 className="title">Login</h2>
+            
+            {(error || msg) && (
+              <div className={`alert ${error ? 'alert-red' : 'alert-green'}`}>
+                {error || msg}
+              </div>
+            )}
 
-        {error && <div className="alert-box alert-error">{error}</div>}
-        {msg && <div className="alert-box alert-success">{msg}</div>}
+            <form onSubmit={handleLogin} className="auth-form">
+              <div className="input-group">
+                <label>User Name</label>
+                <input 
+                  type="email" 
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  required 
+                />
+              </div>
 
-        <form onSubmit={handleLogin}>
-          <div className="input-group">
-            <label>Email Address</label>
-            <input 
-              type="email" 
-              placeholder="name@company.com" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              required 
-            />
-          </div>
+              <div className="input-group">
+                <label>Password</label>
+                <input 
+                  type="password" 
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required 
+                />
+              </div>
 
-          <div className="input-group">
-            <div className="label-row">
-              <label>Password</label>
-              <span className="forgot-link" onClick={handleForgotPassword}>
-                Forgot Password?
-              </span>
+              <div className="options-group">
+                <label className="remember">
+                  <input type="checkbox" /> 
+                  <span className="checkbox-custom"></span>
+                </label>
+                <span className="forgot-text" onClick={handleForgotPassword}>
+                  Forgot Password?
+                </span>
+              </div>
+
+              <button type="submit" className="go-btn" disabled={loading}>
+                {loading ? "..." : "Go"}
+              </button>
+            </form>
+
+            <div className="switch-text">
+              New here? <span onClick={() => { setIsFlipped(true); clearMessages(); }}>Sign Up</span>
             </div>
-            <input 
-              type="password" 
-              placeholder="••••••••" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              required 
-            />
           </div>
-
-          <button type="submit" className="auth-btn" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In →"}
-          </button>
-        </form>
-
-        <div className="auth-footer">
-          Don't have an account? <span onClick={onRegister}>Create One</span>
         </div>
+
+        {/* BACK: SIGN UP */}
+        <div className="auth-face auth-back">
+          <div className="circle-border">
+            <h2 className="title">Sign Up</h2>
+
+            {error && <div className="alert alert-red">{error}</div>}
+
+            <form onSubmit={handleRegister} className="auth-form register-form">
+              <div className="input-group">
+                <label>Full Name</label>
+                <input 
+                  type="text" 
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  required 
+                />
+              </div>
+
+              <div className="input-group">
+                <label>Email Address</label>
+                <input 
+                  type="email" 
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  required 
+                />
+              </div>
+
+              <div className="input-group">
+                <label>Password</label>
+                <input 
+                  type="password" 
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  required 
+                />
+              </div>
+
+              <button type="submit" className="go-btn reg-btn" disabled={loading}>
+                {loading ? "..." : "Create"}
+              </button>
+            </form>
+
+            <div className="switch-text">
+              Already have an account? <span onClick={() => { setIsFlipped(false); clearMessages(); }}>Login</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
 }
-
-export default Login;
