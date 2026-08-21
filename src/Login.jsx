@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "./firebase";
 
 function Login({ onRegister }) {
@@ -7,10 +7,12 @@ function Login({ onRegister }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [msg, setMsg] = useState(""); // Success message for password reset
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setMsg("");
     try {
       setLoading(true);
       await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -20,13 +22,32 @@ function Login({ onRegister }) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setError("");
+    setMsg("");
+    if (!email.trim()) {
+      setError("Please enter your email address first to reset your password.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      setMsg("Password reset link sent to your email!");
+    } catch (err) {
+      setError("Failed to send reset email. Make sure the email is correct.");
+    }
+  };
+
   return (
     <div className="auth-wrapper">
       <div className="auth-box">
-        <h2>Sign In to IssueTrack</h2>
-        <p className="auth-subtitle">Enter your details to manage your issues</p>
+        <div className="brand-header">
+          <div className="logo-icon">IT</div>
+          <h2>Sign In to <span className="highlight">IssueTrack</span></h2>
+        </div>
+        <p className="auth-subtitle">Welcome back! Manage your workspace issues.</p>
 
-        {error && <div className="alert-error">{error}</div>}
+        {error && <div className="alert-box alert-error">{error}</div>}
+        {msg && <div className="alert-box alert-success">{msg}</div>}
 
         <form onSubmit={handleLogin}>
           <div className="input-group">
@@ -41,7 +62,12 @@ function Login({ onRegister }) {
           </div>
 
           <div className="input-group">
-            <label>Password</label>
+            <div className="label-row">
+              <label>Password</label>
+              <span className="forgot-link" onClick={handleForgotPassword}>
+                Forgot Password?
+              </span>
+            </div>
             <input 
               type="password" 
               placeholder="••••••••" 
