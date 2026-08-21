@@ -1,19 +1,39 @@
 import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "./firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import {
+  doc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 
-export default function Register({ onRegister, onLogin }) {
+import { auth, db } from "./firebase";
+
+function Register({ onRegister, onLogin }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
+
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
     setError("");
+
+    if (!name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Please enter your email.");
+      return;
+    }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters.");
@@ -25,155 +45,160 @@ export default function Register({ onRegister, onLogin }) {
       return;
     }
 
-    setLoading(true);
-
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+      setLoading(true);
 
-      const user = userCredential.user;
+      const credential =
+        await createUserWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password
+        );
 
-      await setDoc(doc(db, "users", user.uid), {
-        name,
-        email,
-        role: "user",
-        createdAt: serverTimestamp(),
+      const user = credential.user;
+
+      // Save name in Firebase Authentication
+      await updateProfile(user, {
+        displayName: name.trim(),
       });
 
-      onRegister(user);
-    } catch (err) {
-      if (err.code === "auth/email-already-in-use") {
-        setError("This email is already registered.");
-      } else if (err.code === "auth/invalid-email") {
-        setError("Please enter a valid email address.");
-      } else if (err.code === "auth/weak-password") {
-        setError("Password is too weak.");
-      } else {
-        setError("Registration failed. Please try again.");
+      // Create user profile in Firestore
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          uid: user.uid,
+          name: name.trim(),
+          email: user.email,
+          role: "user",
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      if (onRegister) {
+        onRegister({
+          ...user,
+          displayName: name.trim(),
+        });
       }
+    } catch (err) {
+      console.error("Registration error:", err);
+
+      let message = "Unable to create account.";
+
+      if (err.code === "auth/email-already-in-use") {
+        message = "This email is already registered.";
+      } else if (err.code === "auth/invalid-email") {
+        message = "Please enter a valid email address.";
+      } else if (err.code === "auth/weak-password") {
+        message = "Password is too weak.";
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={styles.icon}>🎫</div>
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-logo">IT</div>
 
-        <h1>Create Account</h1>
+        <div className="auth-header">
+          <p className="eyebrow">ISSUETRACK</p>
+          <h1>Create Account</h1>
+          <p>
+            Create your account to manage and track issues.
+          </p>
+        </div>
 
-        <p style={styles.subtitle}>
-          Register for the Issue Tracking Portal
-        </p>
+        {error && (
+          <div className="auth-error">
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleRegister}>
-          <label>Full Name</label>
-          <input
-            type="text"
-            placeholder="Enter your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
+        <form
+          className="auth-form"
+          onSubmit={handleRegister}
+        >
+          <label>
+            Full Name
 
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+            <input
+              type="text"
+              placeholder="Enter your full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              required
+            />
+          </label>
 
-          <label>Password</label>
-          <input
-            type="password"
-            placeholder="Minimum 6 characters"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          <label>
+            Email Address
 
-          <label>Confirm Password</label>
-          <input
-            type="password"
-            placeholder="Confirm your password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+          </label>
 
-          {error && <div style={styles.error}>{error}</div>}
+          <label>
+            Password
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Creating account..." : "Create Account"}
+            <input
+              type="password"
+              placeholder="Minimum 6 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+            />
+          </label>
+
+          <label>
+            Confirm Password
+
+            <input
+              type="password"
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) =>
+                setConfirmPassword(e.target.value)
+              }
+              autoComplete="new-password"
+              required
+            />
+          </label>
+
+          <button
+            type="submit"
+            className="primary-button auth-submit"
+            disabled={loading}
+          >
+            {loading ? "Creating Account..." : "Create Account"}
           </button>
         </form>
 
-        <p style={styles.login}>
-          Already have an account?{" "}
-          <button onClick={onLogin} style={styles.link}>
-            Sign In
+        <div className="auth-switch">
+          <span>Already have an account?</span>
+
+          <button
+            type="button"
+            onClick={onLogin}
+          >
+            Sign in
           </button>
-        </p>
+        </div>
       </div>
     </div>
   );
 }
 
-const styles = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f4f7fb",
-    padding: "20px",
-  },
-
-  card: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "#fff",
-    padding: "40px",
-    borderRadius: "16px",
-    boxShadow: "0 10px 40px rgba(0,0,0,0.08)",
-  },
-
-  icon: {
-    fontSize: "42px",
-    textAlign: "center",
-  },
-
-  subtitle: {
-    textAlign: "center",
-    color: "#6b7280",
-    marginBottom: "30px",
-  },
-
-  error: {
-    background: "#fee2e2",
-    color: "#b91c1c",
-    padding: "10px",
-    borderRadius: "8px",
-    marginBottom: "15px",
-  },
-
-  login: {
-    textAlign: "center",
-    marginTop: "25px",
-    color: "#6b7280",
-  },
-
-  link: {
-    border: "none",
-    background: "none",
-    color: "#2563eb",
-    cursor: "pointer",
-    fontWeight: "600",
-  },
-};
+export default Register;
